@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+#
+# Vulnotes CLI - Manage on-prem Vulnotes deployments
+# Usage: vulnotes <command> [options]
+#
+
+set -euo pipefail
+
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source all library files
+source "$SCRIPT_DIR/lib/config.sh"
+source "$SCRIPT_DIR/lib/utils.sh"
+source "$SCRIPT_DIR/lib/templates.sh"
+source "$SCRIPT_DIR/lib/commands/init.sh"
+source "$SCRIPT_DIR/lib/commands/lifecycle.sh"
+source "$SCRIPT_DIR/lib/commands/backup.sh"
+source "$SCRIPT_DIR/lib/commands/logs.sh"
+source "$SCRIPT_DIR/lib/commands/help.sh"
+
+# Main entry point
+main() {
+    check_dependencies
+
+    local command="${1:-help}"
+    shift || true
+
+    case "$command" in
+        init)
+            cmd_init "$@"
+            ;;
+        start)
+            cmd_start "$@"
+            ;;
+        stop)
+            cmd_stop "$@"
+            ;;
+        restart)
+            cmd_restart "$@"
+            ;;
+        update)
+            cmd_update "$@"
+            ;;
+        logs)
+            cmd_logs "$@"
+            ;;
+        backup)
+            cmd_backup "$@"
+            ;;
+        restore)
+            cmd_restore "$@"
+            ;;
+        help|--help|-h)
+            cmd_help
+            ;;
+        version|--version|-v)
+            cmd_version
+            ;;
+        *)
+            log_error "Unknown command: $command"
+            echo
+            cmd_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
