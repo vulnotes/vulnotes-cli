@@ -20,6 +20,7 @@ generate_env_file() {
     local domain="$1"
     local jwt_secret="$2"
     local backronaut_secret="$3"
+    local support_api_token="$4"
 
     cat > "$ENV_FILE" << ENV_EOF
 # Vulnotes Environment Configuration
@@ -28,6 +29,7 @@ generate_env_file() {
 DOMAIN=${domain}
 JWT_SECRET=${jwt_secret}
 BACKRONAUT_SECRET=${backronaut_secret}
+SUPPORT_API_TOKEN=${support_api_token}
 ENV_EOF
 
     chmod 600 "$ENV_FILE"

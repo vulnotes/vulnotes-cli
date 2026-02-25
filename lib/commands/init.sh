@@ -53,12 +53,13 @@ cmd_init() {
     }
 
     # Parse response
-    local license_key registry_username registry_password backronaut_secret private_key
+    local license_key registry_username registry_password backronaut_secret support_api_token private_key
 
     license_key=$(echo "$response" | jq -r '.licenseKey')
     registry_username=$(echo "$response" | jq -r '.registryUsername')
     registry_password=$(echo "$response" | jq -r '.registryPassword')
     backronaut_secret=$(echo "$response" | jq -r '.backronautSecret // ""')
+    support_api_token=$(echo "$response" | jq -r '.supportApiToken // ""')
     private_key=$(echo "$response" | jq -r '.privateKey')
 
     if [[ -z "$license_key" || "$license_key" == "null" ]]; then
@@ -112,7 +113,7 @@ cmd_init() {
 
     generate_docker_compose "$http_port" "$bind_address"
     generate_nginx_conf
-    generate_env_file "$domain" "$jwt_secret" "$backronaut_secret"
+    generate_env_file "$domain" "$jwt_secret" "$backronaut_secret" "$support_api_token"
 
     # Create license file with private key for backend license validation
     log_info "Creating license file..."

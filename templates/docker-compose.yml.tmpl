@@ -84,6 +84,7 @@ services:
       - CLIENT_URL=${DOMAIN}
       - API_URL=${DOMAIN}/api
       - BACKRONAUT_SECRET=${BACKRONAUT_SECRET}
+      - SUPPORT_API_TOKEN=${SUPPORT_API_TOKEN}
     volumes:
       - ./license.json:/app/license/license.json:ro
       - backend_uploads:/app/uploads
@@ -115,6 +116,7 @@ services:
       - NEXT_PUBLIC_BACKEND_URL=${DOMAIN}
       - BACKEND_URL=http://backend:5000/api
       - BACKEND_INTERNAL_URL=http://backend:5000/api
+      - NEXT_PUBLIC_SUPPORT_URL=https://support.vulnotes.com
     depends_on:
       - backend
     networks:
