@@ -117,14 +117,13 @@ cmd_init() {
 
     # Create license file with private key for backend license validation
     log_info "Creating license file..."
-    cat > "$INSTALL_DIR/license.json" << LICENSE_EOF
-{
-  "licenseKey": "$license_key",
-  "privateKey": "$private_key",
-  "managerUrl": "$MANAGER_URL",
-  "provisionedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
-LICENSE_EOF
+    jq -n \
+      --arg licenseKey "$license_key" \
+      --arg privateKey "$private_key" \
+      --arg managerUrl "$MANAGER_URL" \
+      --arg provisionedAt "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+      '{licenseKey: $licenseKey, privateKey: $privateKey, managerUrl: $managerUrl, provisionedAt: $provisionedAt}' \
+      > "$INSTALL_DIR/license.json"
     chmod 600 "$INSTALL_DIR/license.json"
 
     # Save configuration
@@ -140,6 +139,10 @@ REGISTRY_URL="$REGISTRY_URL"
 REGISTRY_USERNAME='$registry_username'
 CONFIG_EOF
     chmod 600 "$CONFIG_FILE"
+
+    # Set up automatic daily backups with rotation
+    log_info "Setting up automatic backups..."
+    _backup_cron_install
 
     log_success "Vulnotes initialized successfully!"
     echo
