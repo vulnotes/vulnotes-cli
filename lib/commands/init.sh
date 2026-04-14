@@ -122,7 +122,7 @@ cmd_init() {
       --arg privateKey "$private_key" \
       --arg managerUrl "$MANAGER_URL" \
       --arg provisionedAt "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-      '{licenseKey: $licenseKey, privateKey: $privateKey, managerUrl: $managerUrl, provisionedAt: $provisionedAt}' \
+      '{licenseKey: $licenseKey, clientPrivateKey: $privateKey, managerUrl: $managerUrl, provisionedAt: $provisionedAt}' \
       > "$INSTALL_DIR/license.json"
     chmod 600 "$INSTALL_DIR/license.json"
 
