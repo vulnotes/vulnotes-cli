@@ -10,6 +10,7 @@ services:
     depends_on:
       - backend
       - frontend
+      - mcp
     networks:
       - vulnotes-network
     healthcheck:
@@ -121,6 +122,29 @@ services:
       - backend
     networks:
       - vulnotes-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  mcp:
+    image: registry.vulnotes.com/vulnotes-app/mcp-server:latest
+    container_name: vulnotes-mcp
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - VULNOTES_API_URL=http://backend:5000
+      - PORT=3000
+    depends_on:
+      - backend
+    networks:
+      - vulnotes-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     security_opt:
       - no-new-privileges:true
     cap_drop:
