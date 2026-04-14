@@ -48,6 +48,12 @@ main() {
         backup)
             cmd_backup "$@"
             ;;
+        backup-rotate)
+            cmd_backup_rotate "$@"
+            ;;
+        backup-schedule)
+            cmd_backup_schedule "$@"
+            ;;
         restore)
             cmd_restore "$@"
             ;;
