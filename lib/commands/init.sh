@@ -113,7 +113,7 @@ cmd_init() {
 
     generate_docker_compose "$http_port" "$bind_address"
     generate_nginx_conf
-    generate_env_file "$domain" "$jwt_secret" "$backronaut_secret" "$support_api_token"
+    generate_env_file "$domain" "$jwt_secret" "$backronaut_secret" "$support_api_token" "$http_port"
 
     # Create license file with private key for backend license validation
     log_info "Creating license file..."
