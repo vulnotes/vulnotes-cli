@@ -457,7 +457,10 @@ MANIFEST_EOF
     if [[ "$data_only" != "true" ]]; then
         log_info "Restoring configuration files..."
         [[ -f "$backup_dir/env.backup" ]] && cp "$backup_dir/env.backup" "$INSTALL_DIR/.env"
-        [[ -f "$backup_dir/license.json" ]] && cp "$backup_dir/license.json" "$INSTALL_DIR/license.json"
+        if [[ -f "$backup_dir/license.json" ]]; then
+            cp "$backup_dir/license.json" "$INSTALL_DIR/license.json"
+            chmod 644 "$INSTALL_DIR/license.json"
+        fi
         [[ -f "$backup_dir/nginx.conf" ]] && cp "$backup_dir/nginx.conf" "$INSTALL_DIR/nginx.conf"
     else
         log_info "Skipping config files (--data-only mode)"

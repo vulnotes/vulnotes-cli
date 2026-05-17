@@ -124,7 +124,7 @@ cmd_init() {
       --arg provisionedAt "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
       '{licenseKey: $licenseKey, clientPrivateKey: $privateKey, managerUrl: $managerUrl, provisionedAt: $provisionedAt}' \
       > "$INSTALL_DIR/license.json"
-    chmod 600 "$INSTALL_DIR/license.json"
+    chmod 644 "$INSTALL_DIR/license.json"
 
     # Save configuration
     cat > "$CONFIG_FILE" << CONFIG_EOF
