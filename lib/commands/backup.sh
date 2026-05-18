@@ -58,7 +58,6 @@ cmd_backup() {
     # Backup configuration files
     log_info "Backing up configuration..."
     cp "$INSTALL_DIR/.env" "$backup_path/env.backup" 2>/dev/null || true
-    cp "$INSTALL_DIR/license.json" "$backup_path/license.json" 2>/dev/null || true
     cp "$INSTALL_DIR/nginx.conf" "$backup_path/nginx.conf" 2>/dev/null || true
 
     # Create backup manifest
@@ -388,7 +387,6 @@ cmd_restore() {
 
         # Backup configuration files
         cp "$INSTALL_DIR/.env" "$pre_restore_path/env.backup" 2>/dev/null || true
-        cp "$INSTALL_DIR/license.json" "$pre_restore_path/license.json" 2>/dev/null || true
         cp "$INSTALL_DIR/nginx.conf" "$pre_restore_path/nginx.conf" 2>/dev/null || true
 
         # Create backup manifest
@@ -463,10 +461,6 @@ MANIFEST_EOF
     if [[ "$data_only" != "true" ]]; then
         log_info "Restoring configuration files..."
         [[ -f "$backup_dir/env.backup" ]] && cp "$backup_dir/env.backup" "$INSTALL_DIR/.env"
-        if [[ -f "$backup_dir/license.json" ]]; then
-            cp "$backup_dir/license.json" "$INSTALL_DIR/license.json"
-            chmod 644 "$INSTALL_DIR/license.json"
-        fi
         [[ -f "$backup_dir/nginx.conf" ]] && cp "$backup_dir/nginx.conf" "$INSTALL_DIR/nginx.conf"
     else
         log_info "Skipping config files (--data-only mode)"
