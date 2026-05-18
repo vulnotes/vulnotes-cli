@@ -104,6 +104,24 @@ check_initialized() {
     source "$CONFIG_FILE"
 }
 
+# Returns 0 if the mongodb service is up and running, 1 otherwise.
+# Works on both docker compose v1 and v2 regardless of --status flag support.
+is_vulnotes_running() {
+    cd "$INSTALL_DIR" || return 1
+    local cid
+    cid=$($DOCKER_COMPOSE ps -q mongodb 2>/dev/null | head -1)
+    [[ -n "$cid" ]] || return 1
+    [[ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null)" == "true" ]]
+}
+
+# Aborts with a friendly message if Vulnotes isn't running.
+require_vulnotes_running() {
+    local action="${1:-this action}"
+    if ! is_vulnotes_running; then
+        die "Vulnotes is not running. Start it with 'vulnotes start' before ${action}."
+    fi
+}
+
 # Get the docker compose project name (for volume naming)
 get_compose_project() {
     cd "$INSTALL_DIR"

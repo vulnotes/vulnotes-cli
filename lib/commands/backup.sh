@@ -26,10 +26,7 @@ cmd_backup() {
 
     cd "$INSTALL_DIR"
 
-    # Check if Vulnotes is running
-    if ! $DOCKER_COMPOSE ps --status running 2>/dev/null | grep -q "mongodb"; then
-        die "Vulnotes is not running. Start it with 'vulnotes start' before creating a backup."
-    fi
+    require_vulnotes_running "creating a backup"
 
     local backup_name
     backup_name="vulnotes-backup-$(date +%Y%m%d-%H%M%S)"
@@ -365,17 +362,19 @@ cmd_restore() {
     create_safety_backup="${create_safety_backup:-Y}"
 
     if [[ $create_safety_backup =~ ^[Yy]$ ]] || [[ -z "$create_safety_backup" ]]; then
+        require_vulnotes_running "creating a safety backup (or re-run and decline the safety backup)"
+
         local pre_restore_name="vulnotes-pre-restore-$(date +%Y%m%d-%H%M%S)"
         local pre_restore_path="$INSTALL_DIR/backups/$pre_restore_name"
 
         log_info "Creating safety backup before restore..."
         mkdir -p "$pre_restore_path"
 
-        # Backup MongoDB (if running)
+        # Backup MongoDB
         if $DOCKER_COMPOSE exec -T mongodb mongodump --archive --gzip > "$pre_restore_path/mongodb.archive.gz" 2>/dev/null; then
             log_info "MongoDB backed up"
         else
-            log_warn "Could not backup MongoDB (may not be running)"
+            log_warn "Could not backup MongoDB"
             rm -f "$pre_restore_path/mongodb.archive.gz"
         fi
 
@@ -432,7 +431,14 @@ MANIFEST_EOF
 
     if [[ -z "$backup_dir" ]]; then
         rm -rf "$restore_dir"
-        die "Invalid backup archive"
+        log_error "Invalid backup archive: no 'vulnotes-backup-*' directory found inside $backup_file"
+        echo
+        echo "  This usually means one of:"
+        echo "    - The archive was created while Vulnotes was not running (mongodump produced no output)"
+        echo "    - The archive is a pre-restore safety backup (named 'vulnotes-pre-restore-*'); rename its inner directory or extract manually"
+        echo "    - The file is corrupted or was created by a different tool"
+        echo
+        exit 1
     fi
 
     # Restore MongoDB
