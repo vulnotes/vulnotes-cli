@@ -51,6 +51,13 @@ chmod +x vulnotes
 ./vulnotes restore <backup-file> --data-only   # Restore data only (for migrations)
 ```
 
+### Reset
+```bash
+./vulnotes reset      # Wipe all data and return to a clean install
+```
+Deletes all data in the database (reports, findings, users, companies, templates), uploaded files, logs and the license cache, then restarts the stack into first-time setup.
+
+
 ## Configuration
 
 After `init`, the following files are generated:

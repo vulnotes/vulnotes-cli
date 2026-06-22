@@ -16,6 +16,7 @@ source "$SCRIPT_DIR/lib/templates.sh"
 source "$SCRIPT_DIR/lib/commands/init.sh"
 source "$SCRIPT_DIR/lib/commands/lifecycle.sh"
 source "$SCRIPT_DIR/lib/commands/backup.sh"
+source "$SCRIPT_DIR/lib/commands/reset.sh"
 source "$SCRIPT_DIR/lib/commands/logs.sh"
 source "$SCRIPT_DIR/lib/commands/help.sh"
 
@@ -41,6 +42,9 @@ main() {
             ;;
         update)
             cmd_update "$@"
+            ;;
+        reset)
+            cmd_reset "$@"
             ;;
         logs)
             cmd_logs "$@"

@@ -15,6 +15,7 @@ cmd_help() {
     echo -e "    ${CYAN}stop${NC}              Stop Vulnotes containers"
     echo -e "    ${CYAN}restart${NC}           Restart Vulnotes containers"
     echo -e "    ${CYAN}update${NC}            Pull latest images and recreate containers"
+    echo -e "    ${CYAN}reset${NC}             Wipe all data and return to a clean install (backs up first)"
     echo -e "    ${CYAN}logs${NC}              View container logs"
     echo -e "    ${CYAN}backup${NC}            Create a backup of data and configuration"
     echo -e "    ${CYAN}backup-rotate${NC}     Apply retention policy to existing backups"
@@ -33,6 +34,11 @@ cmd_help() {
     echo
     echo -e "${BOLD}BACKUP OPTIONS:${NC}"
     echo "    --scheduled             Run backup with automatic rotation (used by cron)"
+    echo
+    echo -e "${BOLD}RESET:${NC}"
+    echo "    Deletes the database, uploads, logs and caches; keeps .env, license.json,"
+    echo "    nginx.conf and docker-compose.yml, then restarts into first-time setup."
+    echo "    Always backs up first and asks for confirmation (no flags)."
     echo
     echo -e "${BOLD}BACKUP-SCHEDULE OPTIONS:${NC}"
     echo "    enable                  Enable automatic daily backups at 2:00 AM"
