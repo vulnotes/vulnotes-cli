@@ -42,7 +42,11 @@ cmd_backup() {
 
     # Backup MongoDB
     log_info "Backing up MongoDB..."
-    $DOCKER_COMPOSE exec -T mongodb mongodump --archive --gzip > "$backup_path/mongodb.archive.gz" || {
+    $DOCKER_COMPOSE exec -T mongodb sh -c '
+        AUTH=""
+        if [ -n "$MONGO_INITDB_ROOT_USERNAME" ]; then AUTH="-u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin"; fi
+        exec mongodump --archive --gzip $AUTH
+    ' > "$backup_path/mongodb.archive.gz" || {
         die "Failed to backup MongoDB"
     }
 
@@ -370,7 +374,11 @@ cmd_restore() {
         mkdir -p "$pre_restore_path"
 
         # Backup MongoDB
-        if $DOCKER_COMPOSE exec -T mongodb mongodump --archive --gzip > "$pre_restore_path/mongodb.archive.gz" 2>/dev/null; then
+        if $DOCKER_COMPOSE exec -T mongodb sh -c '
+            AUTH=""
+            if [ -n "$MONGO_INITDB_ROOT_USERNAME" ]; then AUTH="-u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin"; fi
+            exec mongodump --archive --gzip $AUTH
+        ' > "$pre_restore_path/mongodb.archive.gz" 2>/dev/null; then
             log_info "MongoDB backed up"
         else
             log_warn "Could not backup MongoDB"
@@ -444,7 +452,11 @@ MANIFEST_EOF
         log_info "Restoring MongoDB..."
         $DOCKER_COMPOSE up -d mongodb
         sleep 5
-        $DOCKER_COMPOSE exec -T mongodb mongorestore --archive --gzip --drop < "$backup_dir/mongodb.archive.gz"
+        $DOCKER_COMPOSE exec -T mongodb sh -c '
+            AUTH=""
+            if [ -n "$MONGO_INITDB_ROOT_USERNAME" ]; then AUTH="-u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin"; fi
+            exec mongorestore --archive --gzip --drop $AUTH --nsInclude="vulnotes.*"
+        ' < "$backup_dir/mongodb.archive.gz"
         $DOCKER_COMPOSE stop mongodb
     fi
 
