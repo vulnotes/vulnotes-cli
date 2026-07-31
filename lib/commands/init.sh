@@ -69,9 +69,10 @@ cmd_init() {
     log_success "Token redeemed successfully"
     log_info "License: $license_key"
 
-    # Generate JWT secret
-    local jwt_secret
+    # Generate independent secrets for user sessions and the internal renderer.
+    local jwt_secret puppeteer_service_token
     jwt_secret=$(generate_random_hex 32)
+    puppeteer_service_token=$(generate_random_hex 32)
 
     # Login to Docker registry
     log_info "Logging into Docker registry..."
@@ -113,7 +114,7 @@ cmd_init() {
 
     generate_docker_compose "$http_port" "$bind_address"
     generate_nginx_conf
-    generate_env_file "$domain" "$jwt_secret" "$backronaut_secret" "$support_api_token" "$http_port"
+    generate_env_file "$domain" "$jwt_secret" "$backronaut_secret" "$support_api_token" "$http_port" "$puppeteer_service_token"
 
     # Create license file with private key for backend license validation
     log_info "Creating license file..."

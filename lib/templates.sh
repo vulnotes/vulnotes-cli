@@ -22,6 +22,10 @@ generate_env_file() {
     local backronaut_secret="$3"
     local support_api_token="$4"
     local http_port="${5:-80}"
+    local puppeteer_service_token="${6:-}"
+    if [[ -z "$puppeteer_service_token" ]]; then
+        puppeteer_service_token=$(generate_random_hex 32)
+    fi
 
     # Compose DOMAIN with port so it matches the browser-sent Origin header.
     # Skip if the domain already includes a port, or if the port is the
@@ -43,7 +47,30 @@ DOMAIN=${domain_with_port}
 JWT_SECRET=${jwt_secret}
 BACKRONAUT_SECRET=${backronaut_secret}
 SUPPORT_API_TOKEN=${support_api_token}
+PUPPETEER_SERVICE_TOKEN=${puppeteer_service_token}
 ENV_EOF
 
     chmod 600 "$ENV_FILE"
+}
+
+ensure_renderer_secret() {
+    local current=""
+    if [[ -f "$ENV_FILE" ]]; then
+        current=$(sed -n 's/^PUPPETEER_SERVICE_TOKEN=//p' "$ENV_FILE" | tail -n 1)
+    fi
+
+    if [[ ${#current} -ge 64 ]]; then
+        return 0
+    fi
+
+    local token
+    token=$(generate_random_hex 32)
+    if grep -q '^PUPPETEER_SERVICE_TOKEN=' "$ENV_FILE"; then
+        sed -i.bak "s/^PUPPETEER_SERVICE_TOKEN=.*/PUPPETEER_SERVICE_TOKEN=${token}/" "$ENV_FILE"
+        rm -f "${ENV_FILE}.bak"
+    else
+        printf '\nPUPPETEER_SERVICE_TOKEN=%s\n' "$token" >> "$ENV_FILE"
+    fi
+    chmod 600 "$ENV_FILE"
+    log_success "Configured secure internal document renderer credentials"
 }

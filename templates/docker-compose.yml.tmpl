@@ -54,6 +54,8 @@ services:
       - PORT=3001
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_SERVICE_TOKEN=${PUPPETEER_SERVICE_TOKEN}
+      - DOCX_RENDER_FRONTEND_URL=http://frontend:3000
     networks:
       - vulnotes-network
     healthcheck:
@@ -79,6 +81,7 @@ services:
       - NODE_ENV=production
       - STRICT_LICENSE_MODE=true
       - PUPPETEER_SERVICE_URL=http://puppeteer:3001
+      - PUPPETEER_SERVICE_TOKEN=${PUPPETEER_SERVICE_TOKEN}
       - LICENSE_FILE_PATH=/app/license/license.json
       - MONGO_URI=mongodb://mongodb:27017/vulnotes
       - JWT_SECRET=${JWT_SECRET}
