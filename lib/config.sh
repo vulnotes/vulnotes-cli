@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Configuration variables for Vulnotes CLI
 
-VERSION="1.0.7"
+VERSION="1.0.8"
 
 # Fixed URLs
 MANAGER_URL="https://manager.vulnotes.com"

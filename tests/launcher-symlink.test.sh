@@ -20,6 +20,6 @@ chmod 700 "$test_dir/bin/docker" "$test_dir/bin/curl" "$test_dir/bin/jq" "$test_
 ln -s "$repo_dir/vulnotes" "$test_dir/bin/vulnotes"
 
 output=$(PATH="$test_dir/bin:$PATH" VULNOTES_SKIP_UPDATE_CHECK=1 "$test_dir/bin/vulnotes" --version)
-[[ "$output" == "vulnotes v1.0.7" ]]
+[[ "$output" == "vulnotes v1.0.8" ]]
 
 echo "Launcher symlink test passed"
