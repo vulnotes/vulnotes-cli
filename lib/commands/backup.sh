@@ -288,7 +288,13 @@ _backup_cron_remove() {
     existing_crontab=$(crontab -l 2>/dev/null || true)
 
     if echo "$existing_crontab" | grep -q "$cron_marker"; then
-        echo "$existing_crontab" | grep -v "$cron_marker" | crontab -
+        local remaining_crontab
+        remaining_crontab=$(echo "$existing_crontab" | grep -v "$cron_marker" || true)
+        if [[ -n "$remaining_crontab" ]]; then
+            echo "$remaining_crontab" | crontab -
+        else
+            crontab -r 2>/dev/null || true
+        fi
         log_success "Automatic backups disabled"
     else
         log_info "Automatic backups are not currently enabled"

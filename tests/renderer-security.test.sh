@@ -208,4 +208,18 @@ install -m 600 "$ENV_FILE" "$INSTALL_DIR/backups/$backup_name/env.backup"
 [[ "$(mode_of "$INSTALL_DIR/backups/$backup_name.tar.gz")" == 600 ]]
 [[ -z "$(find "$INSTALL_DIR/backups" -name '*.partial.*' -print -quit)" ]]
 
+# Disabling the only scheduled cron entry must leave a clean empty crontab.
+cron_state="$test_dir/crontab"
+printf '0 2 * * * vulnotes backup --scheduled # vulnotes-auto-backup\n' > "$cron_state"
+crontab() {
+    case "${1:-}" in
+        -l) cat "$cron_state" ;;
+        -r) : > "$cron_state" ;;
+        -) cat > "$cron_state" ;;
+        *) return 1 ;;
+    esac
+}
+_backup_cron_remove
+[[ ! -s "$cron_state" ]]
+
 echo "Renderer and backup security tests passed"
