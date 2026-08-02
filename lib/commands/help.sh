@@ -14,7 +14,7 @@ cmd_help() {
     echo -e "    ${CYAN}start${NC}             Start Vulnotes containers"
     echo -e "    ${CYAN}stop${NC}              Stop Vulnotes containers"
     echo -e "    ${CYAN}restart${NC}           Restart Vulnotes containers"
-    echo -e "    ${CYAN}update${NC}            Pull latest images and recreate containers"
+    echo -e "    ${CYAN}update${NC}            Refresh config, pull images, and recreate containers"
     echo -e "    ${CYAN}reset${NC}             Wipe all data and return to a clean install (backs up first)"
     echo -e "    ${CYAN}logs${NC}              View container logs"
     echo -e "    ${CYAN}backup${NC}            Create a backup of data and configuration"
@@ -52,11 +52,22 @@ cmd_help() {
     echo
     echo -e "${BOLD}RESTORE OPTIONS:${NC}"
     echo "    <backup-file>           Backup file to restore (required)"
-    echo "    --data-only             Restore only MongoDB and uploads, keep current config"
-    echo "                            (useful for migrating data between instances)"
+    echo "    (default)               Restores MongoDB and uploads only; the current"
+    echo "                            .env and nginx.conf are kept untouched"
+    echo "    --restore-config        ALSO overwrite .env and nginx.conf from the archive."
+    echo "                            The archive then controls JWT_SECRET and the nginx"
+    echo "                            config that is loaded into the container, so use it"
+    echo "                            only with an archive you created yourself. A diff of"
+    echo "                            nginx.conf is shown and confirmation is required."
+    echo "    --data-only             Explicit form of the default (accepted for"
+    echo "                            compatibility with existing runbooks)"
     echo
     echo -e "${BOLD}ENVIRONMENT VARIABLES:${NC}"
     echo "    VULNOTES_DIR            Override default installation directory"
+    echo "    VULNOTES_SKIP_UPDATE_CHECK=1"
+    echo "                            Disable the failure-tolerant CLI release check"
+    echo "    VULNOTES_CLI_UPDATE_CHECK_INTERVAL"
+    echo "                            Cache duration in seconds (default: 21600)"
 }
 
 cmd_version() {

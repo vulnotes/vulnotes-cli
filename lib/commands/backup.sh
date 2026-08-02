@@ -6,8 +6,31 @@ BACKUP_KEEP_DAILY=7
 BACKUP_KEEP_WEEKLY=4
 BACKUP_KEEP_MONTHLY=6
 
+secure_backup_root() {
+    if [[ -L "$INSTALL_DIR/backups" ]]; then
+        die "Refusing to use symlinked backup directory: $INSTALL_DIR/backups"
+    fi
+    install -d -m 700 "$INSTALL_DIR/backups" \
+        || die "Could not create owner-only backup directory $INSTALL_DIR/backups"
+    chmod 700 "$INSTALL_DIR/backups" \
+        || die "Could not restrict $INSTALL_DIR/backups to 0700"
+}
+
+secure_pack_backup() {
+    local backup_name="$1"
+    local partial="$INSTALL_DIR/backups/.${backup_name}.tar.gz.partial.$$"
+    rm -f "$partial"
+    if ! tar czf "$partial" "$backup_name"; then
+        rm -f "$partial"
+        return 1
+    fi
+    chmod 600 "$partial" || { rm -f "$partial"; return 1; }
+    mv -f "$partial" "$INSTALL_DIR/backups/$backup_name.tar.gz"
+}
+
 cmd_backup() {
     check_initialized
+    umask 077
 
     local scheduled=false
 
@@ -34,7 +57,8 @@ cmd_backup() {
 
     log_step "Creating backup: $backup_name"
 
-    mkdir -p "$backup_path"
+    secure_backup_root
+    install -d -m 700 "$backup_path"
 
     # Get volume name
     local uploads_volume
@@ -61,8 +85,8 @@ cmd_backup() {
 
     # Backup configuration files
     log_info "Backing up configuration..."
-    cp "$INSTALL_DIR/.env" "$backup_path/env.backup" 2>/dev/null || true
-    cp "$INSTALL_DIR/nginx.conf" "$backup_path/nginx.conf" 2>/dev/null || true
+    [[ ! -f "$INSTALL_DIR/.env" ]] || install -m 600 "$INSTALL_DIR/.env" "$backup_path/env.backup"
+    [[ ! -f "$INSTALL_DIR/nginx.conf" ]] || install -m 600 "$INSTALL_DIR/nginx.conf" "$backup_path/nginx.conf"
 
     # Create backup manifest
     cat > "$backup_path/manifest.json" << MANIFEST_EOF
@@ -80,7 +104,7 @@ MANIFEST_EOF
     # Create archive
     log_info "Creating backup archive..."
     cd "$INSTALL_DIR/backups"
-    tar czf "$backup_name.tar.gz" "$backup_name"
+    secure_pack_backup "$backup_name" || die "Failed to create secure backup archive"
     rm -rf "$backup_name"
 
     log_success "Backup created: $INSTALL_DIR/backups/$backup_name.tar.gz"
@@ -300,15 +324,22 @@ _backup_cron_status() {
 
 cmd_restore() {
     check_initialized
+    umask 077
 
     local backup_file=""
-    local data_only=false
+    local data_only=true
+    local restore_config=false
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --data-only)
                 data_only=true
+                shift
+                ;;
+            --restore-config)
+                restore_config=true
+                data_only=false
                 shift
                 ;;
             -*)
@@ -327,7 +358,7 @@ cmd_restore() {
             die "No backups found in $INSTALL_DIR/backups/"
         }
         echo
-        die "Usage: vulnotes restore <backup-file> [--data-only]"
+        die "Usage: vulnotes restore <backup-file> [--restore-config]"
     fi
 
     if [[ ! -f "$backup_file" ]]; then
@@ -341,8 +372,13 @@ cmd_restore() {
 
     log_step "Restoring from backup: $backup_file"
 
-    if [[ "$data_only" == "true" ]]; then
-        log_info "Data-only mode: will restore MongoDB and uploads only (no config files)"
+    if [[ "$restore_config" == "true" ]]; then
+        log_warn "--restore-config: .env and nginx.conf will be OVERWRITTEN from the archive."
+        log_warn ".env carries JWT_SECRET, and nginx.conf is loaded directly into the nginx"
+        log_warn "container. Only do this with an archive you produced yourself."
+    else
+        log_info "Restoring MongoDB and uploads only. .env and nginx.conf are left untouched."
+        log_info "To also restore them from the archive, re-run with --restore-config."
     fi
 
     log_warn "This will overwrite current data and restart Vulnotes."
@@ -371,7 +407,8 @@ cmd_restore() {
         local pre_restore_path="$INSTALL_DIR/backups/$pre_restore_name"
 
         log_info "Creating safety backup before restore..."
-        mkdir -p "$pre_restore_path"
+        secure_backup_root
+        install -d -m 700 "$pre_restore_path"
 
         # Backup MongoDB
         if $DOCKER_COMPOSE exec -T mongodb sh -c '
@@ -394,8 +431,8 @@ cmd_restore() {
         }
 
         # Backup configuration files
-        cp "$INSTALL_DIR/.env" "$pre_restore_path/env.backup" 2>/dev/null || true
-        cp "$INSTALL_DIR/nginx.conf" "$pre_restore_path/nginx.conf" 2>/dev/null || true
+        [[ ! -f "$INSTALL_DIR/.env" ]] || install -m 600 "$INSTALL_DIR/.env" "$pre_restore_path/env.backup"
+        [[ ! -f "$INSTALL_DIR/nginx.conf" ]] || install -m 600 "$INSTALL_DIR/nginx.conf" "$pre_restore_path/nginx.conf"
 
         # Create backup manifest
         cat > "$pre_restore_path/manifest.json" << MANIFEST_EOF
@@ -413,7 +450,7 @@ MANIFEST_EOF
 
         # Create archive
         cd "$INSTALL_DIR/backups"
-        tar czf "$pre_restore_name.tar.gz" "$pre_restore_name"
+        secure_pack_backup "$pre_restore_name" || die "Failed to create secure safety-backup archive"
         rm -rf "$pre_restore_name"
         cd "$INSTALL_DIR"
 
@@ -469,13 +506,29 @@ MANIFEST_EOF
             alpine sh -c "rm -rf /data/* && tar xzf /backup/uploads.tar.gz -C /data"
     fi
 
-    # Restore config files (unless --data-only)
-    if [[ "$data_only" != "true" ]]; then
+    # Restore config files (only with an explicit --restore-config)
+    if [[ "$restore_config" == "true" ]]; then
+        if [[ -f "$backup_dir/nginx.conf" ]]; then
+            echo
+            log_info "Incoming nginx.conf differs from the current one as follows:"
+            echo "  (- current, + from archive)"
+            diff -u "$INSTALL_DIR/nginx.conf" "$backup_dir/nginx.conf" || true
+            echo
+            read -p "Apply this nginx.conf and the archive's .env? [y/N] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log_info "Configuration files left unchanged."
+                restore_config=false
+            fi
+        fi
+    fi
+
+    if [[ "$restore_config" == "true" ]]; then
         log_info "Restoring configuration files..."
-        [[ -f "$backup_dir/env.backup" ]] && cp "$backup_dir/env.backup" "$INSTALL_DIR/.env"
-        [[ -f "$backup_dir/nginx.conf" ]] && cp "$backup_dir/nginx.conf" "$INSTALL_DIR/nginx.conf"
+        [[ -f "$backup_dir/env.backup" ]] && install -m 600 "$backup_dir/env.backup" "$INSTALL_DIR/.env"
+        [[ -f "$backup_dir/nginx.conf" ]] && install -m 600 "$backup_dir/nginx.conf" "$INSTALL_DIR/nginx.conf"
     else
-        log_info "Skipping config files (--data-only mode)"
+        log_info "Skipped .env and nginx.conf (data-only restore; use --restore-config to include them)"
     fi
 
     # Cleanup

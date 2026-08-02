@@ -2,6 +2,7 @@
 # Init command for Vulnotes CLI
 
 cmd_init() {
+    umask 077
     local token=""
 
     # Parse arguments
@@ -38,8 +39,8 @@ cmd_init() {
         fi
     fi
 
-    # Create backups directory
-    mkdir -p "$INSTALL_DIR/backups"
+    # Create backups directory (owner-only: archives contain .env / JWT_SECRET)
+    secure_backup_root
 
     log_info "Redeeming provisioning token..."
 
@@ -47,7 +48,7 @@ cmd_init() {
     local response
     response=$(curl -sf -X POST \
         -H "Content-Type: application/json" \
-        -d "{\"token\": \"$token\"}" \
+        -d "$(jq -n --arg token "$token" '{token: $token}')" \
         "$MANAGER_URL/api/provisioning/redeem" 2>&1) || {
         die "Failed to redeem provisioning token. Please check the token and try again."
     }
@@ -106,7 +107,22 @@ cmd_init() {
     read -p "Choose [1]: " bind_choice
     bind_choice="${bind_choice:-1}"
     if [[ "$bind_choice" == "2" ]]; then
-        bind_address="0.0.0.0"
+        echo
+        log_warn "Option 2 publishes Vulnotes on port $http_port over PLAIN HTTP, with no TLS."
+        echo "  Logins, session tokens and full report contents will cross the network"
+        echo "  in cleartext and can be read or modified by anyone on the path."
+        echo
+        echo "  Recommended instead: keep option 1 (127.0.0.1) and put a TLS-terminating"
+        echo "  reverse proxy (nginx + Let's Encrypt, Traefik, Caddy) in front of it,"
+        echo "  forwarding to 127.0.0.1:$http_port."
+        echo
+        read -p "Publish on 0.0.0.0 without TLS anyway? [y/N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            bind_address="0.0.0.0"
+        else
+            log_info "Keeping local-only binding (127.0.0.1)"
+        fi
     fi
 
     echo
@@ -125,7 +141,18 @@ cmd_init() {
       --arg provisionedAt "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
       '{licenseKey: $licenseKey, clientPrivateKey: $privateKey, managerUrl: $managerUrl, provisionedAt: $provisionedAt}' \
       > "$INSTALL_DIR/license.json"
-    chmod 644 "$INSTALL_DIR/license.json"
+    # license.json holds clientPrivateKey. Restrict it to the backend container's
+    # runtime user (uid 1001 — see the backend image's Dockerfile) where we have
+    # the privilege to do so; otherwise keep the previous 644 so the container can
+    # still read it, and lock the install directory instead.
+    if chown 1001:1001 "$INSTALL_DIR/license.json" 2>/dev/null; then
+        chmod 600 "$INSTALL_DIR/license.json"
+    else
+        chmod 644 "$INSTALL_DIR/license.json"
+        log_warn "Could not restrict ownership of license.json (needs root)."
+        log_warn "It stays readable by other local users of this machine."
+        log_warn "To lock it down later: sudo chown 1001:1001 license.json && sudo chmod 600 license.json"
+    fi
 
     # Save configuration
     cat > "$CONFIG_FILE" << CONFIG_EOF
@@ -168,6 +195,8 @@ CONFIG_EOF
         echo -e "  2. Access Vulnotes at ${CYAN}http://127.0.0.1:$http_port${NC}"
     else
         echo -e "  2. Access Vulnotes at ${CYAN}http://<your-server-ip>:$http_port${NC}"
+        echo -e "     ${YELLOW}This URL is plain HTTP — credentials and reports are sent in cleartext.${NC}"
+        echo -e "     ${YELLOW}Put a TLS reverse proxy in front of it before real use (see below).${NC}"
     fi
     echo
     echo -e "${BOLD}Exposing to the internet:${NC}"
