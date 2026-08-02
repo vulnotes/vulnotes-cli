@@ -9,10 +9,12 @@ cmd_init() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --token|-t)
+                [[ $# -ge 2 ]] || die "Option $1 requires a provisioning token"
                 token="$2"
                 shift 2
                 ;;
             --dir)
+                [[ $# -ge 2 ]] || die "Option --dir requires an installation directory"
                 update_paths "$2"
                 shift 2
                 ;;

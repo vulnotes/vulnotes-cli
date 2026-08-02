@@ -40,14 +40,14 @@ get_latest_cli_version() {
 }
 
 notice=$(check_cli_update)
-[[ "$notice" == *"v1.0.6 -> v9.8.7"* ]]
+[[ "$notice" == *"v1.0.7 -> v9.8.7"* ]]
 
 get_latest_cli_version() {
     echo "9.8.7"
 }
 
 notice=$(check_cli_update)
-[[ "$notice" == *"v1.0.6 -> v9.8.7"* ]]
+[[ "$notice" == *"v1.0.7 -> v9.8.7"* ]]
 
 VULNOTES_SKIP_UPDATE_CHECK=1
 [[ -z "$(check_cli_update)" ]]
