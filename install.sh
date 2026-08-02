@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 #
 # Vulnotes CLI Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/vulnotes/vulnotes-cli/master/install.sh | bash
+#
+# Usage (download, review, then run — do not pipe into a shell):
+#   curl -fsSLO https://raw.githubusercontent.com/vulnotes/vulnotes-cli/master/install.sh
+#   less install.sh
+#   bash install.sh
+#
+# Installs the newest published GitHub release and verifies it against the
+# SHA-256 published with that release. Override with VULNOTES_CLI_VERSION=v1.2.3.
 #
 
 set -euo pipefail
@@ -19,6 +26,14 @@ BOLD='\033[1m'
 REPO="vulnotes/vulnotes-cli"
 INSTALL_DIR="${VULNOTES_INSTALL_DIR:-$HOME/.vulnotes-cli}"
 BIN_DIR="${VULNOTES_BIN_DIR:-$HOME/.local/bin}"
+
+# Release to install. Pin with VULNOTES_CLI_VERSION=v1.2.3 to install a specific
+# tag. "latest" resolves to the most recent published GitHub release.
+VULNOTES_CLI_VERSION="${VULNOTES_CLI_VERSION:-latest}"
+
+# Set VULNOTES_ALLOW_UNVERIFIED=1 to install from the master branch head with no
+# integrity check. Only for pre-release testing.
+VULNOTES_ALLOW_UNVERIFIED="${VULNOTES_ALLOW_UNVERIFIED:-0}"
 
 log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $*"; }
@@ -55,6 +70,10 @@ check_dependencies() {
         missing+=("openssl")
     fi
 
+    if ! check_command sha256sum && ! check_command shasum; then
+        missing+=("sha256sum")
+    fi
+
     # Docker is required
     if ! check_command docker; then
         missing+=("docker")
@@ -78,6 +97,9 @@ check_dependencies() {
                     ;;
                 openssl)
                     echo "  openssl: sudo apt install openssl  OR  brew install openssl"
+                    ;;
+                sha256sum)
+                    echo "  sha256sum: sudo apt install coreutils  OR  brew install coreutils"
                     ;;
             esac
         done
@@ -113,6 +135,24 @@ check_dependencies() {
     fi
 }
 
+sha256_of() {
+    if check_command sha256sum; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+# Resolve the tag to install. "latest" asks GitHub for the newest published release.
+resolve_tag() {
+    if [[ "$VULNOTES_CLI_VERSION" != "latest" ]]; then
+        echo "$VULNOTES_CLI_VERSION"
+        return 0
+    fi
+    curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+        | grep '"tag_name"' | head -1 | cut -d'"' -f4
+}
+
 # Download and install
 install_cli() {
     log_step "Installing Vulnotes CLI"
@@ -121,23 +161,68 @@ install_cli() {
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$BIN_DIR"
 
-    # Download latest release
-    log_info "Downloading from GitHub..."
-
     local tmp_dir
     tmp_dir=$(mktemp -d)
     trap "rm -rf $tmp_dir" EXIT
 
-    curl -fsSL "https://github.com/$REPO/archive/refs/heads/master.tar.gz" -o "$tmp_dir/vulnotes-cli.tar.gz"
+    local tag src_dir
+    tag=$(resolve_tag || true)
+
+    if [[ -n "$tag" ]]; then
+        log_info "Downloading release $tag from GitHub..."
+        local base="https://github.com/$REPO/releases/download/$tag"
+        curl -fsSL "$base/vulnotes-cli-$tag.tar.gz" -o "$tmp_dir/vulnotes-cli.tar.gz" \
+            || die "Could not download the $tag release archive from $base"
+
+        log_info "Verifying SHA-256..."
+        curl -fsSL "$base/vulnotes-cli-$tag.tar.gz.sha256" -o "$tmp_dir/SHA256" \
+            || die "Could not download the published checksum for $tag. Refusing to install unverified code."
+
+        local expected actual
+        expected=$(awk '{print $1}' "$tmp_dir/SHA256" | head -1)
+        actual=$(sha256_of "$tmp_dir/vulnotes-cli.tar.gz")
+        if [[ -z "$expected" ]]; then
+            die "Published checksum for $tag is empty. Refusing to install unverified code."
+        fi
+        if [[ "$expected" != "$actual" ]]; then
+            log_error "CHECKSUM MISMATCH for $tag"
+            log_error "  expected: $expected"
+            log_error "  actual:   $actual"
+            die "Refusing to install. The download does not match the published release."
+        fi
+        log_success "Checksum verified"
+        src_dir="vulnotes-cli-${tag#v}"
+    elif [[ "$VULNOTES_ALLOW_UNVERIFIED" == "1" ]]; then
+        log_warn "No tagged release found and VULNOTES_ALLOW_UNVERIFIED=1 is set."
+        log_warn "Installing the master branch head WITHOUT any integrity check."
+        log_warn "Anyone who can push to master reaches this machine. Do not use in production."
+        curl -fsSL "https://github.com/$REPO/archive/refs/heads/master.tar.gz" -o "$tmp_dir/vulnotes-cli.tar.gz"
+        src_dir="vulnotes-cli-master"
+    else
+        log_error "No published release found for $REPO."
+        echo
+        echo "This installer only installs signed-off, checksummed releases."
+        echo "Options:"
+        echo "  - Install a specific tag:  VULNOTES_CLI_VERSION=v1.0.0 <installer>"
+        echo "  - Clone the repository manually (see the README), or"
+        echo "  - For pre-release testing only, re-run with VULNOTES_ALLOW_UNVERIFIED=1"
+        echo
+        exit 1
+    fi
 
     # Extract
     log_info "Extracting..."
     tar -xzf "$tmp_dir/vulnotes-cli.tar.gz" -C "$tmp_dir"
 
+    if [[ ! -d "$tmp_dir/$src_dir" ]]; then
+        src_dir=$(find "$tmp_dir" -maxdepth 1 -mindepth 1 -type d -name 'vulnotes-cli*' -exec basename {} \; | head -1)
+        [[ -n "$src_dir" ]] || die "Unexpected archive layout: no vulnotes-cli* directory inside the tarball"
+    fi
+
     # Install files
     log_info "Installing to $INSTALL_DIR..."
-    rm -rf "$INSTALL_DIR"/*
-    cp -r "$tmp_dir"/vulnotes-cli-master/* "$INSTALL_DIR/"
+    rm -rf "${INSTALL_DIR:?}"/*
+    cp -r "$tmp_dir/$src_dir"/* "$INSTALL_DIR/"
     chmod +x "$INSTALL_DIR/vulnotes"
 
     # Create symlink in bin directory
