@@ -19,7 +19,7 @@ cmd_logs() {
                 lines="$2"
                 shift 2
                 ;;
-            nginx|backend|frontend|mongodb|puppeteer)
+            nginx|backend|frontend|mongodb|puppeteer|mcp)
                 service="$1"
                 shift
                 ;;
