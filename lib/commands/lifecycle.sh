@@ -180,6 +180,43 @@ refresh_renderer_compose_wiring() {
     log_success "Configured secure document renderer wiring in Docker Compose"
 }
 
+refresh_managed_compose_defaults() {
+    if [[ ! -f "$COMPOSE_FILE" || -L "$COMPOSE_FILE" ]]; then
+        log_error "Missing or unsafe $COMPOSE_FILE"
+        return 1
+    fi
+
+    local temporary
+    temporary=$(mktemp "$(dirname "$COMPOSE_FILE")/.compose.defaults.XXXXXX") || return 1
+    chmod 600 "$temporary" || { rm -f "$temporary"; return 1; }
+
+    awk '
+        /^    image: nginx:(alpine|1[.]27-alpine)$/ {
+            sub(/nginx:.*/, "nginx:1.30.4-alpine")
+        }
+        {
+            gsub(/http:\/\/localhost\/health/, "http://127.0.0.1/health")
+            gsub(/http:\/\/localhost:3000\/health/, "http://127.0.0.1:3000/health")
+            gsub(/host: '\''localhost'\''/, "host: '\''127.0.0.1'\''")
+            print
+        }
+    ' "$COMPOSE_FILE" > "$temporary"
+
+    if cmp -s "$COMPOSE_FILE" "$temporary"; then
+        rm -f "$temporary"
+        return 0
+    fi
+
+    if ! $DOCKER_COMPOSE -f "$temporary" config --quiet >/dev/null; then
+        rm -f "$temporary"
+        log_error "Managed Docker Compose migration failed validation"
+        return 1
+    fi
+
+    mv -f "$temporary" "$COMPOSE_FILE"
+    log_success "Updated managed Docker Compose runtime defaults"
+}
+
 configure_renderer_for_update() {
     validate_update_env_file || return 1
     if [[ ! -f "$COMPOSE_FILE" || -L "$COMPOSE_FILE" ]]; then
@@ -193,7 +230,9 @@ configure_renderer_for_update() {
     install -m 600 "$ENV_FILE" "$transaction_dir/env.before" || { rm -rf "$transaction_dir"; return 1; }
     install -m 600 "$COMPOSE_FILE" "$transaction_dir/compose.before" || { rm -rf "$transaction_dir"; return 1; }
 
-    if ! ensure_renderer_secret || ! refresh_renderer_compose_wiring; then
+    if ! ensure_renderer_secret \
+        || ! refresh_renderer_compose_wiring \
+        || ! refresh_managed_compose_defaults; then
         install -m 600 "$transaction_dir/env.before" "$ENV_FILE"
         install -m 600 "$transaction_dir/compose.before" "$COMPOSE_FILE"
         rm -rf "$transaction_dir"

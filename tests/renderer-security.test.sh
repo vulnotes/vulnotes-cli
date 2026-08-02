@@ -124,6 +124,31 @@ YAML
 refresh_renderer_compose_wiring
 renderer_compose_static_valid "$COMPOSE_FILE"
 
+# Managed updates replace the vulnerable Nginx line and stale localhost health
+# targets without changing an existing MongoDB version line.
+cat > "$COMPOSE_FILE" <<'YAML'
+services:
+  nginx:
+    image: nginx:alpine
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost/health"]
+  mongodb:
+    image: mongo:latest
+  puppeteer:
+    healthcheck:
+      test: ["CMD", "node", "-e", "host: 'localhost'"]
+  frontend:
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000/health"]
+YAML
+refresh_managed_compose_defaults
+grep -q '^    image: nginx:1.30.4-alpine$' "$COMPOSE_FILE"
+grep -q '^    image: mongo:latest$' "$COMPOSE_FILE"
+! grep -q 'localhost.*health' "$COMPOSE_FILE"
+managed_checksum=$(cksum "$COMPOSE_FILE")
+refresh_managed_compose_defaults
+[[ "$(cksum "$COMPOSE_FILE")" == "$managed_checksum" ]]
+
 # Static wiring cannot mask a Compose parser failure.
 valid_compose=$(cat "$COMPOSE_FILE")
 DOCKER_COMPOSE=false
