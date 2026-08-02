@@ -30,7 +30,7 @@ cmd_help() {
     echo -e "${BOLD}LOGS OPTIONS:${NC}"
     echo "    -f, --follow            Follow log output"
     echo "    -n, --lines <num>       Number of lines to show (default: 100)"
-    echo "    <service>               Service name: nginx, backend, frontend, mongodb, puppeteer"
+    echo "    <service>               Service: nginx, backend, frontend, mongodb, puppeteer, mcp"
     echo
     echo -e "${BOLD}BACKUP OPTIONS:${NC}"
     echo "    --scheduled             Run backup with automatic rotation (used by cron)"

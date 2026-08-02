@@ -16,6 +16,8 @@ cmd_logs() {
                 shift
                 ;;
             -n|--lines)
+                [[ $# -ge 2 ]] || die "Option $1 requires a line count"
+                [[ "$2" =~ ^[0-9]+$ ]] || die "Line count must be a non-negative integer: $2"
                 lines="$2"
                 shift 2
                 ;;

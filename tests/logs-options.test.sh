@@ -13,6 +13,7 @@ printf 'DOMAIN=https://example.test\n' > "$CONFIG_FILE"
 
 source "$repo_dir/lib/utils.sh"
 source "$repo_dir/lib/commands/logs.sh"
+source "$repo_dir/lib/commands/help.sh"
 
 fake_compose="$test_dir/fake-compose"
 cat > "$fake_compose" <<'SH'
@@ -23,5 +24,18 @@ chmod 700 "$fake_compose"
 DOCKER_COMPOSE="$fake_compose"
 
 cmd_logs --lines 1 mcp
+
+help_output=$(cmd_help)
+[[ "$help_output" == *"puppeteer, mcp"* ]]
+
+if (cmd_logs --lines) >/dev/null 2>&1; then
+    echo "accepted --lines without a value" >&2
+    exit 1
+fi
+
+if (cmd_logs --lines invalid) >/dev/null 2>&1; then
+    echo "accepted a non-numeric line count" >&2
+    exit 1
+fi
 
 echo "Logs option tests passed"
