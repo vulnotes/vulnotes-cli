@@ -22,6 +22,89 @@ log_step() {
     echo -e "${CYAN}==>${NC} ${BOLD}$*${NC}"
 }
 
+version_is_newer() {
+    local candidate="${1#v}"
+    local current="${2#v}"
+    local candidate_core="${candidate%%-*}"
+    local current_core="${current%%-*}"
+    local candidate_parts=()
+    local current_parts=()
+
+    IFS='.' read -r -a candidate_parts <<< "$candidate_core"
+    IFS='.' read -r -a current_parts <<< "$current_core"
+
+    local index candidate_part current_part
+    for index in 0 1 2; do
+        candidate_part="${candidate_parts[$index]:-0}"
+        current_part="${current_parts[$index]:-0}"
+
+        [[ "$candidate_part" =~ ^[0-9]+$ ]] || return 1
+        [[ "$current_part" =~ ^[0-9]+$ ]] || return 1
+
+        if (( 10#$candidate_part > 10#$current_part )); then
+            return 0
+        fi
+        if (( 10#$candidate_part < 10#$current_part )); then
+            return 1
+        fi
+    done
+
+    return 1
+}
+
+get_latest_cli_version() {
+    local cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/vulnotes-cli"
+    local cache_file="$cache_root/latest-release"
+    local check_interval="${VULNOTES_CLI_UPDATE_CHECK_INTERVAL:-21600}"
+    local now cached_at cached_version
+
+    [[ "$check_interval" =~ ^[0-9]+$ ]] || check_interval=21600
+    now=$(date +%s)
+
+    if [[ -r "$cache_file" ]]; then
+        IFS=' ' read -r cached_at cached_version < "$cache_file" || true
+        if [[ "$cached_at" =~ ^[0-9]+$ ]] && [[ -n "${cached_version:-}" ]] \
+            && (( now - cached_at < check_interval )); then
+            echo "$cached_version"
+            return 0
+        fi
+    fi
+
+    local latest_version
+    latest_version=$(curl -fsSL --connect-timeout 2 --max-time 4 \
+        -H "Accept: application/vnd.github+json" \
+        -H "User-Agent: vulnotes-cli/$VERSION" \
+        "https://api.github.com/repos/vulnotes/vulnotes-cli/releases/latest" 2>/dev/null \
+        | jq -r '.tag_name // empty' 2>/dev/null) || return 1
+
+    [[ "$latest_version" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || return 1
+
+    mkdir -p "$cache_root" 2>/dev/null || true
+    if [[ -d "$cache_root" ]]; then
+        local cache_tmp="${cache_file}.tmp.$$"
+        if printf '%s %s\n' "$now" "$latest_version" > "$cache_tmp" 2>/dev/null; then
+            mv "$cache_tmp" "$cache_file" 2>/dev/null || true
+        fi
+    fi
+
+    echo "$latest_version"
+}
+
+check_cli_update() {
+    [[ "${VULNOTES_SKIP_UPDATE_CHECK:-0}" == "1" ]] && return 0
+
+    local latest_version
+    latest_version=$(get_latest_cli_version) || return 0
+
+    if version_is_newer "$latest_version" "$VERSION"; then
+        local display_latest="v${latest_version#v}"
+        echo
+        log_warn "A Vulnotes CLI update is available: v${VERSION#v} -> $display_latest"
+        echo -e "       Download and run the verified installer: ${CYAN}https://github.com/vulnotes/vulnotes-cli/releases/latest${NC}"
+        echo
+    fi
+}
+
 die() {
     log_error "$@"
     exit 1

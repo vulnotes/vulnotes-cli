@@ -23,6 +23,7 @@ source "$SCRIPT_DIR/lib/commands/help.sh"
 # Main entry point
 main() {
     check_dependencies
+    check_cli_update
 
     local command="${1:-help}"
     shift || true
