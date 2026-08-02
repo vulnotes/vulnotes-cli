@@ -9,12 +9,15 @@ Command-line tool for managing on-prem Vulnotes deployments (requires a license)
 
 ## Installation
 
-**Option 1: Quick install**
+**Option 1: Install script**
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vulnotes/vulnotes-cli/master/install.sh | bash
+curl -fsSLO https://raw.githubusercontent.com/vulnotes/vulnotes-cli/master/install.sh
+bash install.sh
 ```
 
 **Option 2: Manual install**
+
 ```bash
 git clone https://github.com/vulnotes/vulnotes-cli.git
 cd vulnotes-cli
@@ -24,20 +27,26 @@ chmod +x vulnotes
 ## Usage
 
 ### Initialize a new deployment
+
 ```bash
 ./vulnotes init --token <provisioning-token>
 ```
+
 *Provisioning token can be found on https://manager.vulnotes.com when you have a valid on-premise license. Tokens expire after 30 minutes.*
 
 ### Manage containers
+
 ```bash
 ./vulnotes start      # Start Vulnotes
 ./vulnotes stop       # Stop Vulnotes
 ./vulnotes restart    # Restart Vulnotes
-./vulnotes update     # Pull latest images and restart
+./vulnotes update     # Refresh managed config, pull latest images, and restart
 ```
 
+Set `VULNOTES_SKIP_UPDATE_CHECK=1` to disable CLI update checks.
+
 ### View logs
+
 ```bash
 ./vulnotes logs              # All services
 ./vulnotes logs backend      # Specific service
@@ -45,16 +54,22 @@ chmod +x vulnotes
 ```
 
 ### Backup & Restore
+
 ```bash
-./vulnotes backup                              # Create backup
-./vulnotes restore <backup-file>               # Full restore
-./vulnotes restore <backup-file> --data-only   # Restore data only (for migrations)
+./vulnotes backup                                   # Create backup
+./vulnotes restore <backup-file>                    # Restore data (MongoDB + uploads)
+./vulnotes restore <backup-file> --restore-config   # Also overwrite .env and nginx.conf
 ```
 
+Restore keeps your current `.env` and `nginx.conf` by default. Use
+`--restore-config` to restore them from the backup as well.
+
 ### Reset
+
 ```bash
 ./vulnotes reset      # Wipe all data and return to a clean install
 ```
+
 Deletes all data in the database (reports, findings, users, companies, templates), uploaded files, logs and the license cache, then restarts the stack into first-time setup.
 
 
