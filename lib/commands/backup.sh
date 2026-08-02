@@ -141,8 +141,8 @@ cmd_backup_rotate() {
     # Collect all backup files with their parsed dates
     local -a all_backups=()
     local -a keep_files=()
-    local -A weekly_kept=()
-    local -A monthly_kept=()
+    local weekly_kept=$'\n'
+    local monthly_kept=$'\n'
 
     # List backups sorted newest first
     while IFS= read -r file; do
@@ -177,7 +177,9 @@ cmd_backup_rotate() {
         local day="${date_part:6:2}"
 
         local file_ts
-        file_ts=$(date -d "${year}-${month}-${day}" +%s 2>/dev/null) || continue
+        file_ts=$(date -d "${year}-${month}-${day}" +%s 2>/dev/null \
+            || date -j -f '%Y-%m-%d' "${year}-${month}-${day}" +%s 2>/dev/null) \
+            || continue
         local age_seconds=$((now - file_ts))
 
         if [[ $age_seconds -le $daily_seconds ]]; then
@@ -186,36 +188,42 @@ cmd_backup_rotate() {
         elif [[ $age_seconds -le $weekly_seconds ]]; then
             # Within weekly retention window - keep one per ISO week
             local iso_week
-            iso_week=$(date -d "${year}-${month}-${day}" +%G-W%V 2>/dev/null)
-            if [[ -z "${weekly_kept[$iso_week]+_}" ]]; then
+            iso_week=$(date -d "${year}-${month}-${day}" +%G-W%V 2>/dev/null \
+                || date -j -f '%Y-%m-%d' "${year}-${month}-${day}" +%G-W%V 2>/dev/null) \
+                || continue
+            if [[ "$weekly_kept" != *$'\n'"$iso_week"$'\n'* ]]; then
                 # First (newest) backup for this week - keep it
-                weekly_kept[$iso_week]=1
+                weekly_kept+="${iso_week}"$'\n'
                 keep_files+=("$file")
             fi
         elif [[ $age_seconds -le $monthly_seconds ]]; then
             # Within monthly retention window - keep one per month
             local year_month="${year}-${month}"
-            if [[ -z "${monthly_kept[$year_month]+_}" ]]; then
+            if [[ "$monthly_kept" != *$'\n'"$year_month"$'\n'* ]]; then
                 # First (newest) backup for this month - keep it
-                monthly_kept[$year_month]=1
+                monthly_kept+="${year_month}"$'\n'
                 keep_files+=("$file")
             fi
         fi
         # Anything older than monthly window is not kept
     done
 
-    # Build a set of files to keep for fast lookup
-    local -A keep_set=()
-    for f in "${keep_files[@]}"; do
-        keep_set["$f"]=1
-    done
-
     # Delete backups not in the keep set
     local deleted=0
     for file in "${all_backups[@]}"; do
-        if [[ -z "${keep_set[$file]+_}" ]]; then
+        local should_keep=false
+        local kept_file
+        if [[ ${#keep_files[@]} -gt 0 ]]; then
+            for kept_file in "${keep_files[@]}"; do
+                if [[ "$kept_file" == "$file" ]]; then
+                    should_keep=true
+                    break
+                fi
+            done
+        fi
+        if [[ "$should_keep" == "false" ]]; then
             rm -f "$file"
-            ((deleted++))
+            deleted=$((deleted + 1))
         fi
     done
 

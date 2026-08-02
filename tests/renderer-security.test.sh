@@ -222,4 +222,12 @@ crontab() {
 _backup_cron_remove
 [[ ! -s "$cron_state" ]]
 
+# Rotation may delete the first expired archive without tripping set -e on its
+# zero-based deletion counter.
+printf 'DOMAIN=https://example.test\n' > "$CONFIG_FILE"
+expired_backup="$INSTALL_DIR/backups/vulnotes-backup-20200101-000000.tar.gz"
+printf 'expired\n' > "$expired_backup"
+cmd_backup_rotate
+[[ ! -e "$expired_backup" ]]
+
 echo "Renderer and backup security tests passed"
