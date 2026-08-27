@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   release:
-    runs-on: [self-hosted, linux, ARM64, vulnotes-ci]
+    # Keep public-repository workflows isolated from persistent release runners.
+    runs-on: ubuntu-latest
     steps:
       - name: Check out tagged source
         uses: actions/checkout@v6
